@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Teacher {
+  id        Int     @id @default(autoincrement())
+  phone     String  @unique
+  firstName String
+  lastName  String
+  password  String
+  quizzes   Quiz[]
+  createdAt DateTime @default(now())
+}
+
+model Quiz {
+  id          Int       @id @default(autoincrement())
+  title       String
+  status      QuizStatus @default(draft)
+  roomCode    String?    @unique
+  teacher     Teacher   @relation(fields: [teacherId], references: [id])
+  teacherId   Int
+  questions   Question[]
+  participants Participant[]
+  duration     Int?
+  maxParticipants Int?
+  createdAt   DateTime  @default(now())
+}
+
+model Question {
+  id        Int     @id @default(autoincrement())
+  quiz      Quiz    @relation(fields: [quizId], references: [id])
+  quizId    Int
+  text      String
+  options   String[]
+  correctIndex Int
+  answers   Answer[]
+}
+
+model Participant {
+  id          Int      @id @default(autoincrement())
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  quizId      Int
+  name        String
+  socketId    String?
+  score       Int      @default(0)
+  joinedAt    DateTime @default(now())
+  finishedAt  DateTime?
+  answers     Answer[]
+}
+
+model Answer {
+  id            Int       @id @default(autoincrement())
+  participant   Participant @relation(fields: [participantId], references: [id])
+  participantId Int
+  question      Question   @relation(fields: [questionId], references: [id])
+  questionId    Int
+  selectedIndex Int
+  correct       Boolean
+  answeredAt    DateTime  @default(now())
+}
+
+enum QuizStatus {
+  draft
+  waiting
+  active
+  finished
+}

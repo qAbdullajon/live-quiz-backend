@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Quiz" ALTER COLUMN "roomCode" DROP NOT NULL,
+ALTER COLUMN "duration" DROP NOT NULL,
+ALTER COLUMN "maxParticipants" DROP NOT NULL;
