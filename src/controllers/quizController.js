@@ -78,15 +78,33 @@ export const addQuestion = async (req, res, next) => {
 // TEACHER: quiz start
 export const startQuiz = async (req, res, next) => {
     try {
-        const { quizId } = req.params;
-        const { duration, maxParticipants } = req.body
-        const roomCode = generateCode()
+        const quizId = Number(req.params.quizId);
+        const { duration, maxParticipants } = req.body;
+        const roomCode = generateCode();
+
+        const participants = await prisma.participant.findMany({
+            where: { quizId },
+            select: { id: true },
+        });
+
+        const participantIds = participants.map((p) => p.id);
+
+        if (participantIds.length > 0) {
+            await prisma.answer.deleteMany({
+                where: { participantId: { in: participantIds } },
+            });
+            await prisma.participant.deleteMany({
+                where: { id: { in: participantIds } },
+            });
+        }
+
         const quiz = await quizService.startQuiz(quizId, duration, maxParticipants, roomCode);
         res.json({ message: "Quiz started", quiz });
     } catch (err) {
         next(err);
     }
 };
+
 
 // TEACHER: natijalarni olish
 export const updateLive = async (req, res, next) => {

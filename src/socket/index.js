@@ -12,51 +12,49 @@ export const initSocket = (server) => {
 		socket.on("joinQuiz", async ({ code, name, teacher }) => {
 			const quiz = await prisma.quiz.findUnique({
 				where: { roomCode: code },
-				include: { questions: true, }
+				include: { questions: true },
 			});
 			if (!quiz) return socket.emit("error", "Quiz not found");
 
+			socket.join(code);
+
 			if (teacher) {
-				socket.join(code);
 				return;
 			}
 
-			const participant = await prisma.participant.create({
-				data: { quizId: quiz.id, name, socketId: socket.id },
+			let participant = await prisma.participant.findFirst({
+				where: { quizId: quiz.id, name },
 			});
 
-			socket.join(code);
+			if (!participant) {
+				participant = await prisma.participant.create({
+					data: { quizId: quiz.id, name, socketId: socket.id },
+				});
+			} else {
+				await prisma.participant.update({
+					where: { id: participant.id },
+					data: { socketId: socket.id },
+				});
+			}
 
 			const participants = await prisma.participant.findMany({
 				where: { quizId: quiz.id },
 				include: { answers: true, quiz: true },
 			});
 
-			io.to(code).emit("newParticipant", { participants, currentParticipant: participant, quiz });
+			io.to(code).emit("newParticipant", {
+				participants,
+				currentParticipant: participant,
+				quiz,
+			});
 		});
+
 
 		socket.on("goLive", async ({ code }) => {
 			try {
 				const quiz = await prisma.quiz.findUnique({ where: { roomCode: code } });
 				if (!quiz) return;
 
-				const participants = await prisma.participant.findMany({
-					where: { quizId: quiz.id },
-					select: { id: true },
-				});
-
-				const participantIds = participants.map((p) => p.id);
-
-				if (participantIds.length > 0) {
-					await prisma.answer.deleteMany({
-						where: { participantId: { in: participantIds } },
-					});
-					await prisma.participant.deleteMany({
-						where: { id: { in: participantIds } },
-					});
-				}
-
-				// Quizni faollashtiramiz
 				const updatedQuiz = await prisma.quiz.update({
 					where: { roomCode: code },
 					data: { status: "active" },
@@ -75,6 +73,14 @@ export const initSocket = (server) => {
 						const finishedQuiz = await prisma.quiz.update({
 							where: { roomCode: code },
 							data: { status: "draft" },
+							include: {
+								participants: {
+									include: {
+										answers: true,
+									},
+								},
+							},
+
 						});
 						io.to(code).emit("quizFinished", finishedQuiz);
 					} else {
